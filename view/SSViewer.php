@@ -438,7 +438,8 @@ class SSViewer_DataPresenter extends SSViewer_Scope {
 
 		// Check for a presenter-specific override
 		if (array_key_exists($property, $this->overlay)) {
-			$source = array('value' => $this->overlay[$property]);
+			$key = $this->overlay[$property] instanceof Closure ? 'callable' : 'value';
+			$source = array($key => $this->overlay[$property]);
 		}
 		// Check if the method to-be-called exists on the target object - if so, don't check any further
 		// injection locations
@@ -447,7 +448,8 @@ class SSViewer_DataPresenter extends SSViewer_Scope {
 		}
 		// Check for a presenter-specific override
 		else if (array_key_exists($property, $this->underlay)) {
-			$source = array('value' => $this->underlay[$property]);
+			$key = $this->underlay[$property] instanceof Closure ? 'callable' : 'value';
+			$source = array($key => $this->underlay[$property]);
 		}
 		// Then for iterator-specific overrides
 		else if (array_key_exists($property, self::$iteratorProperties)) {
@@ -470,10 +472,14 @@ class SSViewer_DataPresenter extends SSViewer_Scope {
 			$res = array();
 
 			// Look up the value - either from a callable, or from a directly provided value
-			if (isset($source['callable'])) $res['value'] = call_user_func_array($source['callable'], $params);
-			elseif (isset($source['value'])) $res['value'] = $source['value'];
-			else throw new InvalidArgumentException("Injected property $property does't have a value or callable " .
+			if (isset($source['callable'])) {
+				$res['value'] = call_user_func_array($source['callable'], $params);
+			} else if (isset($source['value'])) {
+				$res['value'] = $source['value'];
+			} else {
+				throw new InvalidArgumentException("Injected property $property does't have a value or callable " .
 				"value source provided");
+			}
 
 			// If we want to provide a casted object, look up what type object to use
 			if ($cast) {
@@ -1046,11 +1052,15 @@ class SSViewer {
 		// through $Content and $Layout placeholders.
 		foreach(array('Content', 'Layout') as $subtemplate) {
 			if(isset($this->chosenTemplates[$subtemplate])) {
-				$subtemplateViewer = new SSViewer($this->chosenTemplates[$subtemplate], $this->parser);
-				$subtemplateViewer->includeRequirements(false);
-				$subtemplateViewer->setPartialCacheStore($this->getPartialCacheStore());
-
-				$underlay[$subtemplate] = $subtemplateViewer->process($item, $arguments);
+				$chosenTemplate = $this->chosenTemplates[$subtemplate];
+				$self = $this;
+				$parser = $this->parser;
+				$underlay[$subtemplate] = function() use ($item, $arguments, $chosenTemplate, $self, $parser) {
+					$subtemplateViewer = new SSViewer($chosenTemplate, $parser);
+					$subtemplateViewer->includeRequirements(false);
+					$subtemplateViewer->setPartialCacheStore($self->getPartialCacheStore());
+					return $subtemplateViewer->process($item, $arguments);
+				};
 			}
 		}
 
