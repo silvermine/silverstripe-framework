@@ -1068,12 +1068,6 @@ class Zend_Locale
             return '';
         }
 
-        foreach($parts as $key => $value) {
-            if ((strlen($value) < 2) || (strlen($value) > 3)) {
-                unset($parts[$key]);
-            }
-        }
-
         $locale = implode('_', $parts);
         return (string) $locale;
     }
