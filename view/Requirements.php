@@ -848,8 +848,12 @@ class Requirements_Backend {
 				
 				// If your template already has script tags in the body, then we try to put our script
 				// tags just before those. Otherwise, we put it at the bottom.
+				$p1 = false;
+				preg_match('/<script\s+type=[\'"]text\/javascript[\'"]/', $content, $match);
+				if (!empty($match)) {
+					$p1 = strripos($content, $match[0]);
+				}
 				$p2 = stripos($content, '<body');
-				$p1 = stripos($content, '<script', $p2);
 				
 				$commentTags = array();
 				$canWriteToBody = ($p1 !== false)
@@ -861,8 +865,8 @@ class Requirements_Backend {
 						$commentTags[1] == '-->'
 					);
 
-				if($canWriteToBody) {
-					$content = substr($content,0,$p1) . $jsRequirements . substr($content,$p1);
+				if($canWriteToBody && $p1 > $p2) {
+					$content = substr($content, 0, $p1) . $jsRequirements . substr($content, $p1);
 				} else {
 					$content = preg_replace("/(<\/body[^>]*>)/i", $jsRequirements . "\\1", $content);
 				}
