@@ -51,11 +51,6 @@ mb_http_output('UTF-8');
 mb_internal_encoding('UTF-8');
 mb_regex_encoding('UTF-8');
 
-/**
- * Enable better garbage collection
- */
-gc_enable();
-
 // Include the files needed the initial manifest building, as well as any files
 // that are needed for the boostrap process on every request.
 require_once 'cache/Cache.php';
