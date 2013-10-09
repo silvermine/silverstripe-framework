@@ -449,7 +449,6 @@ class DataObject extends ViewableData implements DataObjectInterface, i18nEntity
 	 */
 	public function destroy() {
 		//$this->destroyed = true;
-		gc_collect_cycles();
 		$this->flushCache(false);
 	}
 
