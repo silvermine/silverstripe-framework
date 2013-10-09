@@ -355,6 +355,10 @@ abstract class Object {
 
 			if (isset($static_properties[$class][$name])) {
 				$value = $static_properties[$class][$name];
+				if ($value instanceof ReflectionProperty) {
+					$value->setAccessible(true);
+					$value = $value->getValue();
+				}
 
 				$parent = get_parent_class($class);
 				if (!$parent) return $value;
