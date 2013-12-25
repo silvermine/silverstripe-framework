@@ -14,8 +14,8 @@ class SS_Cli extends Object {
 		// Special case for buildbot
 		if(isset($_ENV['_']) && strpos($_ENV['_'],'buildbot') !== false) return false;
 
-		if(!defined('STDOUT')) define('STDOUT', fopen("php://stdout","w"));
-		return function_exists('posix_isatty') ? @posix_isatty(STDOUT) : false;
+		$stdout = defined('STDOUT') ? STDOUT : fopen("php://stdout","w");
+		return function_exists('posix_isatty') ? @posix_isatty($stdout) : false;
 	}
 	
 	/**
