@@ -158,6 +158,7 @@ class ClassInfo {
 		if(!isset(self::$_cache_ancestry[$cacheKey])) {
 			$ancestry = array();
 			do {
+				class_exists($parent); // Hack to get HHVM autoloader to load class tree. get_parent_class by itself will not trigger the autoloader
 				if (!$tablesOnly || DataObject::has_own_table($parent)) {
 					$ancestry[$parent] = $parent;
 				}
