@@ -16,6 +16,7 @@
 
 if (version_compare(phpversion(), '5.3.2', '<')) {
 	header("HTTP/1.1 500 Server Error");
+	http_response_code(500);
 	echo str_replace('$PHPVersion', phpversion(), file_get_contents("dev/install/php5-required.html"));
 	die();
 }
@@ -166,6 +167,7 @@ global $databaseConfig;
 if(!isset($databaseConfig) || !isset($databaseConfig['database']) || !$databaseConfig['database']) {
 	if(!file_exists(BASE_PATH . '/install.php')) {
 		header($_SERVER['SERVER_PROTOCOL'] . " 500 Server Error");
+		http_response_code(500);
 		die('SilverStripe Framework requires a $databaseConfig defined.');
 	}
 	$s = (isset($_SERVER['SSL']) || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off')) ? 's' : '';
