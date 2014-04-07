@@ -254,7 +254,7 @@ EOT
 			if(!headers_sent($file, $line)) {
 				header($_SERVER['SERVER_PROTOCOL'] . " $this->statusCode " . $this->getStatusDescription());
 				foreach($this->headers as $header => $value) {
-					header("$header: $value", true, $this->statusCode);
+					header("$header: $value", true);
 				}
 			} else {
 				// It's critical that these status codes are sent; we need to report a failure if not.
