@@ -2075,7 +2075,7 @@ class i18n extends Object implements TemplateGlobalProvider, Flushable {
 				$translation = $adapter->translate($entity, $locale);
 
 					// Return translation only if we found a match thats not the entity itself (Zend fallback)
-				if($translation && $translation != $entity) {
+				if(is_string($translation) && trim($translation) != '' && $translation != $entity) {
 						$returnValue = $translation;
 					break 2;
 					}
