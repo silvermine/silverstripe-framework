@@ -2047,6 +2047,13 @@ class i18n extends Object implements TemplateGlobalProvider {
 
 				$translation = $adapter->translate($entity, $locale);
 
+				// In the event the translation is a number, make sure to cast it to a string. Without this,
+				// we cannot have a translatable value such as '3'. The cast to string is required so '0' is
+				// also allowed as a translation.
+				if (is_numeric($translation)) {
+					$translation = (string) $translation;
+				}
+
 					// Return translation only if we found a match thats not the entity itself (Zend fallback)
 				if(is_string($translation) && trim($translation) != '' && $translation != $entity) {
 						$returnValue = $translation;
