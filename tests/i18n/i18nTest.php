@@ -445,7 +445,51 @@ class i18nTest extends SapphireTest {
 		
 		i18n::set_locale($oldLocale);
 	}
-	
+
+	public function testTranslatedDataTypes() {
+		i18n::get_translator('core')->getAdapter()->addTranslation(array(
+			'i18nTestModule.INTEGER' => 1234,
+			'i18nTestModule.FLOAT' => 123.4235,
+			'i18nTestModule.ZERO' => 0,
+			'i18nTestModule.TRUE' => true,
+			'i18nTestModule.EMPTY' => '',
+			'i18nTestModule.WHITESPACE' => '       ',
+			'i18nTestModule.FANCYNUMBER' => '987,654,321.01',
+		), 'en_US');
+
+		$this->assertEquals(1234, i18n::_t('i18nTestModule.INTEGER'),
+			'Returns the translated integer'
+		);
+
+		$this->assertEquals(123.4235, i18n::_t('i18nTestModule.FLOAT'),
+			'Returns the translated float'
+		);
+
+		$this->assertEquals('987,654,321.01', i18n::_t('i18nTestModule.FANCYNUMBER'),
+			'Returns the fancy number'
+		);
+
+		$this->assertEquals(0, i18n::_t('i18nTestModule.ZERO'),
+			'Is able to return a zero'
+		);
+
+		$this->assertEquals('', i18n::_t('i18nTestModule.TRUE'),
+			'Returns blank string for bool(true)'
+		);
+
+		$this->assertEquals('', i18n::_t('i18nTestModule.FALSE'),
+			'Returns blank string for bool(false)'
+		);
+
+		$this->assertEquals('', i18n::_t('i18nTestModule.EMPTY'),
+			'Returns empty string for empty translation'
+		);
+
+		$this->assertEquals('', i18n::_t('i18nTestModule.WHITESPACE'),
+			'Returns empty string for whitespace only translation'
+		);
+	}
+
 	public function testIncludeByLocale() {
 		// Looping through modules, so we can test the translation autoloading
 		// Load non-exclusive to retain core class autoloading
