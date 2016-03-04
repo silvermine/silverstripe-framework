@@ -615,7 +615,25 @@ class GridField extends FormField {
 	public function gridFieldAlterAction($data, $form, SS_HTTPRequest $request) {
 		$html = '';
 		$data = $request->requestVars();
-		$fieldData = @$data[$this->getName()];
+
+		// Protection against CSRF attacks
+		$token = $this
+			->getForm()
+			->getSecurityToken();
+		if(!$token->checkRequest($request)) {
+			$this->httpError(400, _t("Form.CSRF_FAILED_MESSAGE",
+				"There seems to have been a technical problem. Please click the back button, ".
+				"refresh your browser, and try again."
+			));
+		}
+
+		$name = $this->getName();
+
+		$fieldData = null;
+
+		if(isset($data[$name])) {
+			$fieldData = $data[$name];
+		}
 
 		// Update state from client
 		$state = $this->getState(false);
