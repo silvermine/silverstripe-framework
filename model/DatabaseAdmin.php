@@ -282,6 +282,22 @@ class DatabaseAdmin extends Controller {
 	}
 
 	/**
+	 * Clear all data out of the database by creating a copy of all the tables and deleting the old versions.
+	 */
+	public function clearDataByClone() {
+		$tables = DB::getConn()->tableList();
+		foreach($tables as $table) {
+			if(method_exists(DB::getConn(), 'clearTable')) {
+				DB::getConn()->clearTable($table);
+			} else {
+				DB::query("CREATE TABLE \"{$table}_new\" LIKE \"{$table}\"");
+				DB::query("RENAME TABLE \"{$table}\" TO \"{$table}_old\", \"{$table}_new\" TO \"{$table}\"");
+				DB::query("DROP TABLE \"{$table}_old\"");
+			}
+		}
+	}
+
+	/**
 	 * Remove invalid records from tables - that is, records that don't have
 	 * corresponding records in their parent class tables.
 	 */
