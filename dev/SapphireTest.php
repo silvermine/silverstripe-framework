@@ -225,11 +225,11 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 				//echo "Re-creating temp database... ";
 				self::create_temp_db();
 				//echo "done.\n";
+			} else {
+				self::empty_temp_db();
 			}
 
 			singleton('DataObject')->flushCache();
-			
-			self::empty_temp_db();
 			
 			foreach($this->requireDefaultRecordsFrom as $className) {
 				$instance = singleton($className);
