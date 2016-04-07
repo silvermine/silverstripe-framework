@@ -225,11 +225,11 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 				//echo "Re-creating temp database... ";
 				self::create_temp_db();
 				//echo "done.\n";
+			} else {
+				self::empty_temp_db();
 			}
 
 			singleton('DataObject')->flushCache();
-			
-			self::empty_temp_db();
 			
 			foreach($this->requireDefaultRecordsFrom as $className) {
 				$instance = singleton($className);
@@ -750,7 +750,7 @@ class SapphireTest extends PHPUnit_Framework_TestCase {
 	public static function empty_temp_db() {
 		if(self::using_temp_db()) {
 			$dbadmin = new DatabaseAdmin();
-			$dbadmin->clearAllData();
+			$dbadmin->clearDataByClone();
 			
 			// Some DataExtensions keep a static cache of information that needs to 
 			// be reset whenever the database is cleaned out
