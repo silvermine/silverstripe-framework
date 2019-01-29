@@ -26,7 +26,9 @@
  * @subpackage fields-structural
  */
 class TabSet extends CompositeField {
-	
+
+	protected $tabSet;
+
 	/**
 	 * @param string $name Identifier
 	 * @param string $title (Optional) Natural language title of the tabset
