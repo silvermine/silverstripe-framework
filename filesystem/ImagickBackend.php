@@ -135,7 +135,10 @@ class ImagickBackend extends Imagick implements Image_Backend {
 	 */
 	public function resizeRatio($maxWidth, $maxHeight, $useAsMinimum = false) {
 		if(!$this->valid()) return;
-		
+
+		$maxWidth = intval($maxWidth);
+		$maxHeight = intval($maxHeight);
+
 		$geometry = $this->getImageGeometry();
 	
 		$widthRatio = $maxWidth / $geometry["width"];
@@ -155,7 +158,9 @@ class ImagickBackend extends Imagick implements Image_Backend {
 	 */
 	public function resizeByWidth($width) {
 		if(!$this->valid()) return;
-		
+
+		$width = intval($width);
+
 		$geometry = $this->getImageGeometry();
 		
 		$heightScale = $width / $geometry["width"];
@@ -170,7 +175,9 @@ class ImagickBackend extends Imagick implements Image_Backend {
 	 */
 	public function resizeByHeight($height) {
 		if(!$this->valid()) return;
-		
+
+		$height = intval($height);
+
 		$geometry = $this->getImageGeometry();
 		
 		$scale = $height / $geometry["height"];
@@ -187,6 +194,8 @@ class ImagickBackend extends Imagick implements Image_Backend {
 	public function paddedResize($width, $height, $backgroundColor = "#FFFFFF00") {
 		if(!$this->valid()) return;
 		
+		$width = intval($width);
+		$height = intval($height);
 		$width = round($width);
 		$height = round($height);
 		$geometry = $this->getImageGeometry();
