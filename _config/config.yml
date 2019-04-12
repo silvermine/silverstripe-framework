@@ -13,19 +13,13 @@ MySQLDatabase:
   collation: utf8_general_ci
 HTTP:
   cache_control:
-    no-cache: "true"
-    no-store: "true"
+    max-age: 0
     must-revalidate: "true"
-  vary: "X-Forwarded-Protocol"
+    no-transform: "true"
+  vary: "Cookie, X-Forwarded-Protocol, User-Agent, Accept"
 LeftAndMain:
   dependencies:
     versionProvider: %$SilverStripeVersionProvider
 SilverStripeVersionProvider:
   modules:
     silverstripe/framework: Framework
----
-Only:
-  environment: dev
----
-HTTP:
-  disable_http_cache: true

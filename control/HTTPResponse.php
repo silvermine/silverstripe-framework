@@ -189,15 +189,9 @@ class SS_HTTPResponse {
 	 * @param string $header
 	 * @returns null|string
 	 */
-	public function getHeader($header, $anyCase = false) {
-		if ($anyCase) {
-			$headers = array_change_key_case($this->headers, CASE_LOWER);
-			$header = strtolower($header);
-		} else {
-			$headers = $this->headers;
-		}
-		if(isset($headers[$header]))
-			return $headers[$header];
+	public function getHeader($header) {
+		if(isset($this->headers[$header]))
+			return $this->headers[$header];
 		}
 
 	/**
