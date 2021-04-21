@@ -173,6 +173,12 @@ class LeftAndMain extends Controller implements PermissionProvider {
 	private static $frame_options = 'SAMEORIGIN';
 
 	/**
+	 * @config
+	 * @var boolean
+	 */
+	private static $prevent_reparenting_through_tree = false;
+
+	/**
 	 * @var PjaxResponseNegotiator
 	 */
 	protected $responseNegotiator;
@@ -1141,6 +1147,16 @@ class LeftAndMain extends Controller implements PermissionProvider {
 
 		// Update hierarchy (only if ParentID changed)
 		if($node->ParentID != $parentID) {
+			if($this->config()->prevent_reparenting_through_tree) {
+				$this->getResponse()
+					->setStatusCode(403)
+					->addHeader('X-Status', rawurlencode(_t(
+						'LeftAndMain.CANT_REPARENT',
+						'Reparenting a page through the site tree is not allowed. Please use "Settings > Parent page". Your change was not saved.'
+					)));
+				return;
+			}
+
 			$node->ParentID = (int)$parentID;
 			$node->write();
 
