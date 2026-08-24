@@ -1570,6 +1570,182 @@ EOC;
 		$this->assertTrue(file_exists($cacheFile), 'Cache file wasn\'t created when it was meant to');
 		unlink($cacheFile);
 	}
+
+	/**
+	 * Tests that a compiled template is published without leaving a temp file behind, from a
+	 * template file and from a template string
+	 *
+	 * Those are the only two places that save a compiled template. The other tests below call the
+	 * write method directly, so this is the one that covers the real call sites.
+	 */
+	public function testTemplateCacheFilesArePublishedAtomically() {
+		// sha1(rand()) gives the template a fresh name on every run, so no two runs and no two tests
+		// ever share a cache file
+		$tmplFile = TEMP_FOLDER . '/SSViewerTest_atomic_' . sha1(rand()) . '.ss';
+		file_put_contents($tmplFile, 'From a file');
+		// SSViewer names the cache file after the path of the template, with the separators flattened
+		// to dots. This rebuilds that name so the test knows which file to look for.
+		$fileCache = TEMP_FOLDER . '/.cache'
+			. str_replace(array('\\','/',':'), '.', Director::makeRelative(realpath($tmplFile)));
+		$tmpl = new SSViewer($tmplFile);
+
+		// process() renders the template, which compiles and caches it on the way. It returns an
+		// HTMLText object, and the leading '' . casts that to a plain string.
+		$this->assertContains('From a file', trim('' . $tmpl->process(new ViewableData())));
+		// The temp file is the cache file name plus a unique suffix, so glob() searches for that name
+		// with anything in between and '.tmp' on the end. An empty array means none was left.
+		$this->assertEquals(array(), glob($fileCache . '.*.tmp'), 'A temp file was left behind');
+		unlink($fileCache);
+		unlink($tmplFile);
+
+		// A template held in a string is cached under a hash of its own content, so the name is fixed
+		// rather than random. Any file left by an earlier run is removed first.
+		$content = 'From a string';
+		$stringCache = TEMP_FOLDER . '/.cache.' . sha1($content);
+		if (file_exists($stringCache)) {
+			unlink($stringCache);
+		}
+
+		// The third argument to render() turns caching on. Without it nothing is written to disk and
+		// there would be no cache file to check.
+		$this->assertContains($content, $this->render($content, null, true));
+		$this->assertEquals(array(), glob($stringCache . '.*.tmp'), 'A temp file was left behind');
+		unlink($stringCache);
+	}
+
+	/**
+	 * Tests that the cache file is swapped in by rename() rather than opened for writing.
+	 *
+	 * rename() replaces the directory entry, so a handle that was opened beforehand still reads
+	 * the original inode. fopen($cacheFile, 'w') truncates the very file that the handle refers
+	 * to, which is the window in which a concurrent request reads the file empty.
+	 */
+	public function testTemplateCacheFileIsSwappedInRatherThanWrittenInPlace() {
+		$cacheFile = TEMP_FOLDER . '/.cache.SSViewerTest_swap_' . sha1(rand());
+
+		// The helper returns the error that the write reported, so null means the write succeeded
+		$this->assertNull($this->cacheFileWriteError($cacheFile, 'first'));
+		// PHP caches file information of its own, which has to be dropped to see the change
+		clearstatcache(true, $cacheFile);
+		// The inode is the identity of a file on disk. The handle stands in for a request that is
+		// reading the cache file while it is rewritten.
+		$firstInode = fileinode($cacheFile);
+		$openBeforeRewrite = fopen($cacheFile, 'r');
+
+		$this->assertNull($this->cacheFileWriteError($cacheFile, 'second'));
+		clearstatcache(true, $cacheFile);
+
+		// stream_get_contents() reads through the handle opened earlier, not by the file name, so it
+		// reads whichever file that handle still points at
+		$this->assertEquals('first', stream_get_contents($openBeforeRewrite),
+			'The cache file was opened for writing instead of being replaced');
+		$this->assertNotEquals($firstInode, fileinode($cacheFile),
+			'The cache file kept its inode, so it was written in place rather than renamed over');
+		$this->assertEquals('second', file_get_contents($cacheFile));
+
+		fclose($openBeforeRewrite);
+		unlink($cacheFile);
+	}
+
+	/**
+	 * Tests that a publish which cannot complete raises an error, rather than leaving the template
+	 * to render as an empty string, and that it leaves no temp file behind
+	 */
+	public function testFailureToPublishTemplateCacheFileRaisesError() {
+		// rename() cannot replace a directory whatever the user, and it fails after the temp file
+		// has been written, which is the path that has to clean up after itself
+		$cacheFile = TEMP_FOLDER . '/.cache.SSViewerTest_blocked_' . sha1(rand());
+		// A directory is put where the cache file would go, so the write gets as far as the rename
+		// and then fails
+		mkdir($cacheFile);
+
+		$error = $this->cacheFileWriteError($cacheFile, 'Test content');
+
+		$this->assertNotNull($error, 'A publish that failed raised no error');
+		// The text SSViewer passes to user_error() when it cannot publish
+		$this->assertContains("Couldn't write", $error->getMessage());
+		$this->assertEquals(array(), glob($cacheFile . '.*.tmp'), 'A temp file was left behind');
+
+		rmdir($cacheFile);
+	}
+
+	/**
+	 * Tests that failing to rewrite a cache file keeps the existing one, which still renders, rather
+	 * than turning a working page into an error
+	 *
+	 * A user not held to directory permissions, such as root, cannot cause this failure, so the test
+	 * probes the folder first and skips itself.
+	 */
+	public function testFailureToRewriteTemplateCacheFileKeepsTheExistingOne() {
+		$folder = TEMP_FOLDER . '/SSViewerTest_readonly_' . sha1(rand());
+		mkdir($folder);
+		$cacheFile = $folder . '/.cache.SSViewerTest_stale';
+		file_put_contents($cacheFile, 'Previous content');
+		// 0555 is read and execute for everyone, and write for nobody, so no new file can be created
+		// in the folder while the file already inside it stays readable
+		chmod($folder, 0555);
+
+		// '@' throws away the warning that fopen() raises when it cannot create the file
+		$probe = @fopen($folder . '/probe', 'w');
+		// The probe was created, so this user ignores the permissions and the failure cannot be
+		// produced. Clean up and skip rather than report a false pass.
+		if($probe !== false) {
+			fclose($probe);
+			unlink($folder . '/probe');
+			chmod($folder, 0777);
+			unlink($cacheFile);
+			rmdir($folder);
+			$this->markTestSkipped('Read-only folders are not enforced for the current user');
+		}
+
+		$error = $this->cacheFileWriteError($cacheFile, 'New content');
+		// Make the folder writable again straight away, so the cleanup at the end still works even
+		// if an assertion below fails and ends the test early
+		chmod($folder, 0777);
+
+		// The helper masks warnings, so null here means the failure was reported as a warning and not
+		// as the fatal error that the test above expects
+		$this->assertNull($error, 'A rewrite that failed was made fatal, even though the existing '
+			. 'cache file still renders');
+		$this->assertEquals('Previous content', file_get_contents($cacheFile),
+			'The existing cache file was lost');
+
+		unlink($cacheFile);
+		rmdir($folder);
+	}
+
+	/**
+	 * Calls the protected SSViewer::writeCacheFile() and returns the error it raised, or null.
+	 *
+	 * fopen() and rename() are left unsuppressed in SSViewer so that the reason a write failed is
+	 * logged next to the failure itself. Those warnings are masked here so that PHPUnit does not
+	 * convert one of them into the error under test.
+	 *
+	 * @param string $cacheFile
+	 * @param string $content
+	 * @return Exception|null
+	 */
+	private function cacheFileWriteError($cacheFile, $content) {
+		// setAccessible() lifts the 'protected' keyword for this one handle on the method, and
+		// invoke() below then calls it on an instance
+		$method = new ReflectionMethod('SSViewer', 'writeCacheFile');
+		$method->setAccessible(true);
+		$error = null;
+
+		// error_reporting() returns the level it replaced, so $reporting holds the old value to put
+		// back. '& ~(...)' clears just those two bits and leaves every other kind reported.
+		$reporting = error_reporting(error_reporting() & ~(E_WARNING | E_USER_WARNING));
+		try {
+			// SSViewer_FromString is the lightest concrete SSViewer to call the method on. It needs no
+			// template file, and writeCacheFile() uses nothing from the instance.
+			$method->invoke(new SSViewer_FromString($content), $cacheFile, $content);
+		} catch(Exception $e) {
+			$error = $e;
+		}
+		error_reporting($reporting);
+
+		return $error;
+	}
 }
 
 /**

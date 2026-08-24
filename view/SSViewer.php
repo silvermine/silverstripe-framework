@@ -1181,6 +1181,68 @@ class SSViewer implements Flushable {
 	}
 
 	/**
+	 * Publishes a compiled template to its cache file.
+	 *
+	 * The content is written to a temporary file in the same directory and renamed into place.
+	 * rename() is atomic, so a concurrent request never sees a partial cache file: it reads the
+	 * one that was there before, or the whole of the new one, or none at all and compiles the
+	 * template itself.
+	 *
+	 * A write that cannot complete leaves $cacheFile as it was and reports the failure. With no
+	 * cache file to render from, the response is given an HTTP 500 and the report is fatal. With
+	 * one, the report is a warning and that file is rendered.
+	 *
+	 * @param string $cacheFile - The path of the cache file to publish
+	 * @param string $content - The template compiled to PHP
+	 */
+	protected function writeCacheFile($cacheFile, $content) {
+		// The temp file is a sibling of $cacheFile so rename() stays on one filesystem, and it keeps
+		// '.cache' in its name so flush_template_cache() reaps any orphan left by a killed process.
+		$tmpFile = $cacheFile . '.' . uniqid(getmypid()) . '.tmp';
+		$success = false;
+
+		// None of these report a failure by throwing, so each result is checked in turn
+		$fh = fopen($tmpFile, 'w');
+
+		if($fh !== false) {
+			// A full disk gives a short write rather than a failed one, so the count fwrite() returns is
+			// compared against the length of the content
+			$written = fwrite($fh, $content);
+			// fclose() reports a failure to flush the write buffer, so it can fail where fwrite() did not
+			$closed = fclose($fh);
+
+			if($written === strlen($content) && $closed) {
+				// $cacheFile is only ever replaced by the rename, so nothing partial is ever published
+				$success = rename($tmpFile, $cacheFile);
+			}
+
+			// Left unsuppressed so that a cleanup which fails is logged like the rest
+			if(!$success) unlink($tmpFile);
+		}
+
+		if(!$success) {
+			// A cache file that already has content still renders, stale at worst. Without one the
+			// include() that follows returns '', and an empty body must not go out as an HTTP 200
+			// for a cache in front of the site to keep.
+			$renderable = (is_file($cacheFile) && filesize($cacheFile) > 0);
+
+			if(!$renderable && !headers_sent()) {
+				// Debug::friendlyError() sends the status itself only when Debug.friendly_error_httpcode
+				// is set, and that is off by default, so the response is given its 500 here. The version
+				// in the status line is not what goes on the wire - the SAPI rewrites it - and the code
+				// is passed separately so the status is set even where the line is not parsed.
+				// $_SERVER['SERVER_PROTOCOL'] is not used because templates also compile on the command
+				// line, where it does not exist.
+				header("Cache-Control: no-store");
+				header('HTTP/1.1 500 Internal Server Error', true, 500);
+			}
+
+			user_error("SSViewer::writeCacheFile(): Couldn't write '$cacheFile'",
+				$renderable ? E_USER_WARNING : E_USER_ERROR);
+		}
+	}
+
+	/**
 	 * The process() method handles the "meat" of the template processing.
 	 *
 	 * It takes care of caching the output (via {@link SS_Cache}), as well as
@@ -1216,9 +1278,7 @@ class SSViewer implements Flushable {
 			$content = file_get_contents($template);
 			$content = $this->parseTemplateContent($content, $template);
 
-			$fh = fopen($cacheFile,'w');
-			fwrite($fh, $content);
-			fclose($fh);
+			$this->writeCacheFile($cacheFile, $content);
 		}
 
 		$underlay = array('I18NNamespace' => basename($template));
@@ -1382,9 +1442,7 @@ class SSViewer_FromString extends SSViewer {
 
 		if(!file_exists($cacheFile) || isset($_GET['flush'])) {
 			$content = $this->parseTemplateContent($this->content, "string sha1=$hash");
-			$fh = fopen($cacheFile,'w');
-			fwrite($fh, $content);
-			fclose($fh);
+			$this->writeCacheFile($cacheFile, $content);
 		}
 
 		$val = $this->includeGeneratedTemplate($cacheFile, $item, $arguments, null, $scope);
